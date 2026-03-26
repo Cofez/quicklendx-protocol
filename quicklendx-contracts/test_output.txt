@@ -1,3 +1,36 @@
+================================================================================
+QuickLendX contracts - unit test output (summary)
+================================================================================
+
+This file is a duplicate/alternate artifact name present in the repo.
+The security/testing notes for the dispute evidence validation change set
+are documented in `quicklendx-contracts/TEST_OUTPUT.txt`.
+
+================================================================================
+QuickLendX contracts - unit test output (summary)
+================================================================================
+
+Dispute evidence / reason validation update
+
+Observed failure (historical run captured in repo):
+- test: `test_string_limits::test_dispute_limits`
+- panic: `assertion failed: client.try_create_dispute(...).is_ok()`
+- location: `src\test_string_limits.rs:159:5`
+
+Security notes (this change set)
+- Dispute payloads are now validated via helpers in `src/verification.rs`:
+  - `validate_dispute_reason`: rejects empty or > `MAX_DISPUTE_REASON_LENGTH` bytes with `InvalidDisputeReason` (1905)
+  - `validate_dispute_evidence`: rejects empty or > `MAX_DISPUTE_EVIDENCE_LENGTH` bytes with `InvalidDisputeEvidence` (1906)
+  - `validate_dispute_resolution`: rejects empty or > `MAX_DISPUTE_RESOLUTION_LENGTH` bytes with `InvalidDisputeReason` (1905) for historical/test compatibility
+- `src/dispute.rs` runs these validations before writing any dispute data to persistent storage, bounding storage growth per dispute.
+
+Test plan / coverage
+- Updated `src/test_dispute.rs` with evidence boundary cases:
+  - evidence = 1 char (accepted)
+  - evidence = MAX (accepted)
+  - evidence = empty (rejected with `InvalidDisputeEvidence`)
+- Updated `src/test_string_limits.rs` with a dispute evidence minimum-length acceptance test.
+
 warning: unused imports: `Address` and `String`
  --> src\defaults.rs:6:19
   |
@@ -1015,3 +1048,30 @@ failures:
 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.11s
 
 error: test failed, to rerun pass `-p quicklendx-contracts --lib`
+
+================================================================================
+Dispute validation payload notes (this change set)
+================================================================================
+
+Security goal
+- Prevent abusive on-chain storage growth by bounding `reason`, `evidence`, and `resolution` payload sizes and rejecting empty payloads where required.
+
+What was changed
+- `quicklendx-contracts/src/verification.rs`
+  - Added `validate_dispute_reason`, `validate_dispute_evidence`, and `validate_dispute_resolution`.
+  - Validation uses explicit, stable `QuickLendXError` variants:
+    - `InvalidDisputeReason` (1905)
+    - `InvalidDisputeEvidence` (1906)
+- `quicklendx-contracts/src/dispute.rs`
+  - Calls the above validators before any persistent storage write.
+  - `evidence` now rejects `len == 0` (previously empty evidence could be accepted).
+
+Tests updated/added
+- `quicklendx-contracts/src/test_dispute.rs`
+  - Added evidence boundary coverage for exactly `1` char and exactly `MAX_DISPUTE_EVIDENCE_LENGTH`.
+- `quicklendx-contracts/src/test_string_limits.rs`
+  - Added a dispute evidence minimum-length acceptance test.
+
+Expected test outcome
+- After these validation changes, `test_string_limits::test_dispute_limits` should pass for inputs at maximum configured bounds, and empty evidence should fail with `InvalidDisputeEvidence`.
+

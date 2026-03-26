@@ -1,8 +1,6 @@
 use crate::QuickLendXError;
 use crate::invoice::{Invoice, InvoiceStatus};
-use crate::protocol_limits::{
-    MAX_DISPUTE_EVIDENCE_LENGTH, MAX_DISPUTE_REASON_LENGTH, MAX_DISPUTE_RESOLUTION_LENGTH,
-};
+use crate::verification::{validate_dispute_evidence, validate_dispute_reason, validate_dispute_resolution};
 use soroban_sdk::{contracttype, Address, BytesN, Env, String, Vec};
 
 #[contracttype]
@@ -30,6 +28,17 @@ pub struct Dispute {
 
 
 
+/// @notice Create a new dispute with bounded `reason` and `evidence`.
+/// @dev Validation occurs before any persistent storage writes to prevent abusive
+///      storage growth. The caller must be the invoice business or funding investor.
+///
+/// # Errors
+/// - `DisputeAlreadyExists` if a dispute exists for `invoice_id`
+/// - `InvoiceNotFound` if the invoice does not exist
+/// - `InvoiceNotAvailableForFunding` if the invoice is not eligible
+/// - `DisputeNotAuthorized` if `creator` is not an authorized invoice participant
+/// - `InvalidDisputeReason` if `reason` is empty or exceeds `MAX_DISPUTE_REASON_LENGTH`
+/// - `InvalidDisputeEvidence` if `evidence` is empty or exceeds `MAX_DISPUTE_EVIDENCE_LENGTH`
 #[allow(dead_code)]
 pub fn create_dispute(
     env: Env,
@@ -62,13 +71,9 @@ pub fn create_dispute(
         return Err(QuickLendXError::DisputeNotAuthorized);
     }
 
-    if reason.len() == 0 || reason.len() > MAX_DISPUTE_REASON_LENGTH {
-        return Err(QuickLendXError::InvalidDisputeReason);
-    }
-
-    if evidence.len() > MAX_DISPUTE_EVIDENCE_LENGTH {
-        return Err(QuickLendXError::InvalidDisputeEvidence);
-    }
+    // Validate payload sizes before persisting the dispute record.
+    validate_dispute_reason(&reason)?;
+    validate_dispute_evidence(&evidence)?;
 
     let dispute = Dispute {
         invoice_id: invoice_id.clone(),
@@ -125,6 +130,16 @@ pub fn put_dispute_under_review(
     Ok(())
 }
 
+/// @notice Resolve an existing dispute with bounded `resolution` text.
+/// @dev Resolution validation rejects empty payloads and enforces the protocol maximum
+///      size to prevent storage abuse.
+///
+/// # Errors
+/// - `DisputeNotFound` if the dispute does not exist
+/// - `NotAdmin` / `Unauthorized` if the caller is not the configured admin
+/// - `DisputeNotUnderReview` if the dispute is not currently under review
+/// - `DisputeAlreadyResolved` if the dispute was already resolved
+/// - `InvalidDisputeReason` if `resolution` is empty or exceeds `MAX_DISPUTE_RESOLUTION_LENGTH`
 #[allow(dead_code)]
 pub fn resolve_dispute(
     env: &Env,
@@ -158,9 +173,7 @@ pub fn resolve_dispute(
         return Err(QuickLendXError::DisputeAlreadyResolved);
     }
 
-    if resolution.len() == 0 || resolution.len() > MAX_DISPUTE_RESOLUTION_LENGTH {
-        return Err(QuickLendXError::InvalidDisputeEvidence);
-    }
+    validate_dispute_resolution(&resolution)?;
 
     dispute.status = DisputeStatus::Resolved;
     dispute.resolution = Some(resolution);

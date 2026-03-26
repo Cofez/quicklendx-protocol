@@ -159,6 +159,27 @@ fn test_dispute_limits() {
     assert!(client.try_create_dispute(&invoice_id, &business, &reason, &evidence).is_ok());
 }
 
+#[test]
+fn test_dispute_limits_evidence_min() {
+    let (env, client, admin) = setup();
+    let business = Address::generate(&env);
+    verify_business(&client, &admin, &business);
+
+    let amount = 1000i128;
+    let due_date = env.ledger().timestamp() + 86400;
+    let category = crate::invoice::InvoiceCategory::Services;
+    let desc = String::from_str(&env, "Invoice for dispute");
+    let currency = Address::generate(&env);
+    let tags = Vec::new(&env);
+
+    let invoice_id = client.upload_invoice(&business, &amount, &currency, &due_date, &desc, &category, &tags);
+
+    // Evidence minimum length is 1 char (non-empty payload).
+    let reason = create_string(&env, 1);
+    let evidence = create_string(&env, 1);
+    assert!(client.try_create_dispute(&invoice_id, &business, &reason, &evidence).is_ok());
+}
+
 // ============================================================================
 // TAG NORMALIZATION + STRING LIMIT INTERACTION TESTS (#527)
 // ============================================================================

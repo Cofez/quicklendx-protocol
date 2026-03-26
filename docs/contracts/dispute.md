@@ -22,10 +22,10 @@ Open → UnderReview → Resolved
 |-------|------|-------------|
 | `invoice_id` | `u64` | Associated invoice identifier |
 | `creator` | `Address` | Dispute initiator (business or investor) |
-| `reason` | `String` | Dispute reason (1-500 chars) |
-| `evidence` | `String` | Supporting evidence (0-2000 chars) |
+| `reason` | `String` | Dispute reason (1-1000 chars) |
+| `evidence` | `String` | Supporting evidence (1-2000 chars) |
 | `status` | `DisputeStatus` | Current lifecycle stage |
-| `resolution` | `Option<String>` | Admin resolution text (0-1000 chars) |
+| `resolution` | `Option<String>` | Admin resolution text (1-2000 chars) |
 | `created_at` | `u64` | Creation timestamp |
 | `resolved_at` | `Option<u64>` | Resolution timestamp |
 
@@ -51,16 +51,16 @@ Creates a new dispute for a funded or settled invoice.
 - Invoice must be in Funded or Settled status
 - Creator must be either business owner or investor on the invoice
 - No existing dispute for this invoice
-- Reason must be 1-500 characters
-- Evidence must be ≤2000 characters
+- Reason must be 1-1000 characters
+- Evidence must be 1-2000 characters
 
 **Errors:**
 - `DisputeAlreadyExists`: Dispute already exists for this invoice
 - `InvoiceNotAvailableForFunding`: Invoice not in valid state
 - `DisputeNotAuthorized`: Creator is not business or investor
 - `InvoiceNotFound`: Invoice does not exist
-- `InvalidDisputeReason`: Reason empty or exceeds 500 chars
-- `InvalidDisputeEvidence`: Evidence exceeds 2000 chars
+- `InvalidDisputeReason`: Reason empty or exceeds 1000 chars
+- `InvalidDisputeEvidence`: Evidence empty or exceeds 2000 chars
 
 ### Admin Functions
 
@@ -87,7 +87,7 @@ Finalizes dispute with resolution text.
 - Caller must be admin
 - Dispute must exist
 - Dispute status must be UnderReview
-- Resolution must be 1-1000 characters
+- Resolution must be 1-2000 characters
 
 **Errors:**
 - `Unauthorized`: Caller not admin
@@ -95,7 +95,7 @@ Finalizes dispute with resolution text.
 - `DisputeNotFound`: No dispute for this invoice
 - `DisputeNotUnderReview`: Dispute not in UnderReview status
 - `DisputeAlreadyResolved`: Dispute already resolved
-- `InvalidDisputeEvidence`: Resolution empty or exceeds 1000 chars
+- `InvalidDisputeReason`: Resolution empty or exceeds 2000 chars
 
 ### Query Functions
 
@@ -184,9 +184,9 @@ assert_eq!(dispute.status, DisputeStatus::Resolved);
 
 | Field | Minimum | Maximum |
 |-------|---------|---------|
-| Reason | 1 char | 500 chars |
-| Evidence | 0 chars | 2000 chars |
-| Resolution | 1 char | 1000 chars |
+| Reason | 1 char | 1000 chars |
+| Evidence | 1 char | 2000 chars |
+| Resolution | 1 char | 2000 chars |
 
 ### State Transition Rules
 
@@ -221,7 +221,7 @@ assert_eq!(dispute.status, DisputeStatus::Resolved);
 **Input Validation:**
 - Length limits prevent storage abuse
 - Empty reason/resolution rejected
-- Evidence optional but bounded
+- Evidence non-empty and bounded
 
 **Access Control:**
 - Admin address stored in instance storage
@@ -234,17 +234,17 @@ All operations return `Result<T, QuickLendXError>`:
 
 | Error | Code | Condition |
 |-------|------|-----------|
-| `DisputeNotFound` | 1037 | Dispute does not exist |
-| `DisputeAlreadyExists` | 1038 | Duplicate dispute creation |
-| `DisputeNotAuthorized` | 1039 | Unauthorized creator |
-| `DisputeAlreadyResolved` | 1040 | Dispute already finalized |
-| `DisputeNotUnderReview` | 1041 | Invalid status for resolution |
-| `InvalidDisputeReason` | 1042 | Reason validation failed |
-| `InvalidDisputeEvidence` | 1043 | Evidence/resolution validation failed |
-| `Unauthorized` | 1004 | Admin verification failed |
-| `NotAdmin` | 1005 | Admin not configured |
+| `DisputeNotFound` | 1900 | Dispute does not exist |
+| `DisputeAlreadyExists` | 1901 | Duplicate dispute creation |
+| `DisputeNotAuthorized` | 1902 | Unauthorized creator |
+| `DisputeAlreadyResolved` | 1903 | Dispute already finalized |
+| `DisputeNotUnderReview` | 1904 | Invalid status for resolution |
+| `InvalidDisputeReason` | 1905 | Reason/resolution validation failed |
+| `InvalidDisputeEvidence` | 1906 | Evidence validation failed |
+| `Unauthorized` | 1100 | Admin verification failed |
+| `NotAdmin` | 1103 | Admin not configured |
 | `InvoiceNotFound` | 1000 | Invoice does not exist |
-| `InvalidStatus` | 1003 | Invalid state transition |
+| `InvalidStatus` | 1401 | Invalid state transition |
 
 ## Query Patterns
 

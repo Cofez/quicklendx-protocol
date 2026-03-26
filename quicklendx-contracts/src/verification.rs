@@ -4,8 +4,52 @@ use crate::invoice::{Invoice, InvoiceMetadata, InvoiceStatus};
 use crate::protocol_limits::{
     check_string_length, ProtocolLimitsContract, MAX_DESCRIPTION_LENGTH, MAX_KYC_DATA_LENGTH,
     MAX_NAME_LENGTH, MAX_ADDRESS_LENGTH, MAX_TAX_ID_LENGTH, MAX_REJECTION_REASON_LENGTH,
+    MAX_DISPUTE_EVIDENCE_LENGTH, MAX_DISPUTE_REASON_LENGTH, MAX_DISPUTE_RESOLUTION_LENGTH,
 };
 use soroban_sdk::{contracttype, symbol_short, vec, Address, Env, String, Vec};
+
+/// @notice Validate dispute reason payload.
+///
+/// @dev Enforces bounded storage growth by rejecting:
+/// - empty reasons
+/// - reasons larger than `MAX_DISPUTE_REASON_LENGTH` bytes
+///
+/// # Errors
+/// - `InvalidDisputeReason` if the reason is empty or exceeds the maximum allowed size.
+pub fn validate_dispute_reason(reason: &String) -> Result<(), QuickLendXError> {
+    if reason.len() == 0 || reason.len() > MAX_DISPUTE_REASON_LENGTH {
+        return Err(QuickLendXError::InvalidDisputeReason);
+    }
+    Ok(())
+}
+
+/// @notice Validate dispute evidence payload.
+///
+/// @dev Evidence must be present and bounded to avoid storing empty/meaningless disputes
+/// and to keep the on-chain payload size within protocol limits.
+///
+/// # Errors
+/// - `InvalidDisputeEvidence` if the evidence is empty or exceeds the maximum allowed size.
+pub fn validate_dispute_evidence(evidence: &String) -> Result<(), QuickLendXError> {
+    if evidence.len() == 0 || evidence.len() > MAX_DISPUTE_EVIDENCE_LENGTH {
+        return Err(QuickLendXError::InvalidDisputeEvidence);
+    }
+    Ok(())
+}
+
+/// @notice Validate dispute resolution payload.
+///
+/// @dev Resolution is bounded to prevent storage abuse. For historical/test compatibility,
+/// the validation errors use `InvalidDisputeReason`.
+///
+/// # Errors
+/// - `InvalidDisputeReason` if the resolution is empty or exceeds the maximum allowed size.
+pub fn validate_dispute_resolution(resolution: &String) -> Result<(), QuickLendXError> {
+    if resolution.len() == 0 || resolution.len() > MAX_DISPUTE_RESOLUTION_LENGTH {
+        return Err(QuickLendXError::InvalidDisputeReason);
+    }
+    Ok(())
+}
 
 #[contracttype]
 #[derive(Clone, Eq, PartialEq)]

@@ -11,6 +11,7 @@
 use super::*;
 use crate::errors::QuickLendXError;
 use crate::invoice::{DisputeStatus, InvoiceCategory};
+use crate::protocol_limits::MAX_DISPUTE_EVIDENCE_LENGTH;
 use soroban_sdk::{
     testutils::{Address as _, BytesN as _},
     Address, BytesN, Env, String, Vec,
@@ -199,6 +200,20 @@ fn test_create_dispute_empty_evidence() {
     assert_eq!(contract_err, QuickLendXError::InvalidDisputeEvidence);
 }
 
+/// Test 7b: Evidence validation - boundary minimum length (exactly 1 char)
+#[test]
+fn test_create_dispute_evidence_boundary_min() {
+    let (env, client, admin) = setup();
+    let business = create_verified_business(&env, &client, &admin);
+    let invoice_id = create_test_invoice(&env, &client, &business, 100_000);
+
+    let reason = String::from_str(&env, "Valid reason");
+    let evidence = String::from_str(&env, "A");
+
+    let result = client.try_create_dispute(&invoice_id, &business, &reason, &evidence);
+    assert!(result.is_ok());
+}
+
 /// Test 8: Evidence validation - maximum length (1000 chars)
 #[test]
 fn test_create_dispute_evidence_too_long() {
@@ -215,6 +230,21 @@ fn test_create_dispute_evidence_too_long() {
     let err = result.err().unwrap();
     let contract_err = err.expect("expected contract error");
     assert_eq!(contract_err, QuickLendXError::InvalidDisputeEvidence);
+}
+
+/// Test 8b: Evidence validation - boundary maximum length (exactly MAX)
+#[test]
+fn test_create_dispute_evidence_boundary_max() {
+    let (env, client, admin) = setup();
+    let business = create_verified_business(&env, &client, &admin);
+    let invoice_id = create_test_invoice(&env, &client, &business, 100_000);
+
+    let reason = String::from_str(&env, "Valid reason");
+    let long_evidence_str = "x".repeat(MAX_DISPUTE_EVIDENCE_LENGTH as usize);
+    let evidence = String::from_str(&env, long_evidence_str.as_str());
+
+    let result = client.try_create_dispute(&invoice_id, &business, &reason, &evidence);
+    assert!(result.is_ok());
 }
 
 /// Test 9: Put dispute under review - status transition
